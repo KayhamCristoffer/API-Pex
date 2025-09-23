@@ -56,3 +56,12 @@ def test_database_connection():
     except Exception as e:
         # Se algo falhar, retorna um erro 500 com a mensagem de erro detalhada
         raise HTTPException(status_code=500, detail=f"Erro na conexão com o banco de dados: {e}")
+
+@app.get("/full-db")
+def mostrar_banco_completo():
+    """
+    Retorna todo o conteúdo do banco de dados do Firebase.
+    """
+    ref = db.reference()
+    dados_completos = ref.get() or {}
+    return dados_completos
