@@ -88,7 +88,12 @@ def criar_ecoponto(ecoponto: EcopontoCreate):
     eco_id = str(uuid.uuid4())
     ref = db.reference(f"ecopontos/{eco_id}")
     ref.set({
-        **ecoponto.dict(),
+        "nome": ecoponto.nome,
+        "endereco": ecoponto.endereco,
+        "cep": ecoponto.cep,
+        "latitude": ecoponto.latitude,
+        "longitude": ecoponto.longitude,
+        "criadoPor": ecoponto.criadoPor,
         "criadoEm": datetime.utcnow().isoformat() + "Z",
         "status": "ativo"
     })
