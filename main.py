@@ -148,3 +148,27 @@ def rejeitar_sugestao(sug_id: str):
         raise HTTPException(status_code=404, detail="Sugestão não encontrada")
     ref.update({"status": "rejeitado"})
     return {"message": "Sugestão rejeitada"}
+
+@app.put("/ecopontos/{eco_id}")
+def atualizar_ecoponto(eco_id: str, nome: str, endereco: str, cep: str, latitude: float, longitude: float):
+    ref = db.reference(f"ecopontos/{eco_id}")
+    if not ref.get():
+        raise HTTPException(status_code=404, detail="Ecoponto não encontrado")
+    
+    ref.update({
+        "nome": nome,
+        "endereco": endereco,
+        "cep": cep,
+        "latitude": latitude,
+        "longitude": longitude
+    })
+    return {"id": eco_id, "message": "Ecoponto atualizado com sucesso"}
+
+@app.delete("/ecopontos/{eco_id}")
+def deletar_ecoponto(eco_id: str):
+    ref = db.reference(f"ecopontos/{eco_id}")
+    if not ref.get():
+        raise HTTPException(status_code=404, detail="Ecoponto não encontrado")
+
+    ref.delete()
+    return {"id": eco_id, "message": "Ecoponto deletado com sucesso"}
