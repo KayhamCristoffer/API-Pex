@@ -18,6 +18,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Configuração de CORS para permitir requisições de qualquer origem
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,6 +27,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Classe Pydantic para um item de teste, útil para endpoints de escrita
+class TestItem(BaseModel):
+    name: str
+    value: str
+
+# Inicialização do Firebase a partir das variáveis de ambiente
 if not firebase_admin._apps:
     try:
         firebase_config_str = os.getenv("FIREBASE_CONFIG_JSON")
@@ -42,7 +49,7 @@ if not firebase_admin._apps:
     except Exception as e:
         print(f"Erro ao inicializar o Firebase: {e}")
         raise
-
+        
 # ==============================
 # 3. ROTA DE TESTE
 # ==============================
