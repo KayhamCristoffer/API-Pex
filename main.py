@@ -82,7 +82,15 @@ def root():
 def listar_ecopontos():
     ref = db.reference("ecopontos")
     return ref.get() or {}
-
+    
+@app.get("/ecopontos/{eco_id}")
+def obter_ecoponto(eco_id: str):
+    ref = db.reference(f"ecopontos/{eco_id}")
+    ecoponto = ref.get()
+    if not ecoponto:
+        raise HTTPException(status_code=404, detail="Ecoponto não encontrado")
+    return ecoponto
+    
 @app.post("/ecopontos")
 def criar_ecoponto(ecoponto: EcopontoCreate):
     eco_id = str(uuid.uuid4())
@@ -171,7 +179,13 @@ def aprovar_sugestao(sug_id: str):
     })
     ref.update({"status": "aprovado"})
     return {"message": "Ecoponto aprovado e movido para ecopontos", "eco_id": eco_id}
-
+@app.get("/ecopontos/{eco_id}/avaliacoes")
+def obter_avaliacoes_ecoponto(eco_id: str):
+    ref = db.reference(f"ecopontos/{eco_id}/avaliacoes")
+    avaliacoes = ref.get()
+    if not avaliacoes:
+        raise HTTPException(status_code=404, detail="Ecoponto ou avaliações não encontrados")
+    return avaliacoes
 @app.post("/sugestoes/rejeitar/{sug_id}")
 def rejeitar_sugestao(sug_id: str):
     ref = db.reference(f"sugestoes_ecopontos/{sug_id}")
@@ -179,3 +193,11 @@ def rejeitar_sugestao(sug_id: str):
         raise HTTPException(status_code=404, detail="Sugestão não encontrada")
     ref.update({"status": "rejeitado"})
     return {"message": "Sugestão rejeitada"}
+    # Obtém os dados de um usuário pelo ID
+@app.get("/users/{user_id}")
+def obter_usuario(user_id: str):
+    ref = db.reference(f"users/{user_id}")
+    usuario = ref.get()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    return usuario
