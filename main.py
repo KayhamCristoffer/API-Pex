@@ -1,25 +1,34 @@
+# ==============================
+# 1. IMPORTS NO TOPO DO ARQUIVO
+# ==============================
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from firebase_admin import credentials, initialize_app, db
+import firebase_admin
+from firebase_admin import credentials, db, initialize_app
 from datetime import datetime
 import uuid, os
 import json
-    
+
+# ===============================================
+# 2. INICIALIZAÇÃO DA APLICAÇÃO E FIREBASE
+# ===============================================
+
+app = FastAPI(
+    title="Rotas Ecopontos API",
+    description="API única para ecopontos, avaliações, rotas e sugestões",
+    version="1.0.0"
+)
+
+# 🔹 Inicializa Firebase
 if not firebase_admin._apps:
     try:
-        # Pega a string JSON da variável de ambiente
         firebase_config_str = os.getenv("FIREBASE_CONFIG_JSON")
-
         if not firebase_config_str:
             raise Exception("Variável de ambiente 'FIREBASE_CONFIG_JSON' não encontrada.")
-
-        # Converte a string JSON para um objeto Python (dicionário)
         cred_info = json.loads(firebase_config_str)
-
-        # Usa o dicionário para inicializar o Firebase de forma segura
         cred = credentials.Certificate(cred_info)
-        firebase_admin.initialize_app(cred, {
-            "databaseURL": os.getenv("FIREBASE_DB_URL") # Você já usa uma variável aqui, ótimo!
+        initialize_app(cred, {
+            "databaseURL": os.getenv("FIREBASE_DB_URL")
         })
     except json.JSONDecodeError:
         print("Erro: A variável de ambiente FIREBASE_CONFIG_JSON não é um JSON válido.")
@@ -28,32 +37,25 @@ if not firebase_admin._apps:
         print(f"Erro ao inicializar o Firebase: {e}")
         raise
 
-app = FastAPI(
-    title="Rotas Ecopontos API",
-    description="API única para ecopontos, avaliações, rotas e sugestões",
-    version="1.0.0"
-)
-
-# 🔹 CORS (permitir chamadas do GitHub Pages)
+# 🔹 CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],     # Em produção, troque para seu domínio
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 # ==============================
-# ROTAS BÁSICAS
+# 3. ROTAS DA API
 # ==============================
 @app.get("/")
 def root():
     return {"message": "🚀 API Rotas Ecopontos Online!", "docs": "/docs"}
 
 
-# ==============================
-# ECOPONTOS
-# ==============================
+# --- ROTAS ECOPONTOS ---
 @app.get("/ecopontos")
 def listar_ecopontos():
     ref = db.reference("ecopontos")
@@ -76,9 +78,7 @@ def criar_ecoponto(nome: str, endereco: str, cep: str, latitude: float, longitud
     return {"id": eco_id, "message": "Ecoponto adicionado com sucesso"}
 
 
-# ==============================
-# AVALIAÇÕES
-# ==============================
+# --- ROTAS AVALIAÇÕES ---
 @app.post("/avaliacoes/{eco_id}")
 def adicionar_avaliacao(eco_id: str, usuarioId: str, nota: int, comentario: str):
     ref_eco = db.reference(f"ecopontos/{eco_id}")
@@ -96,9 +96,7 @@ def adicionar_avaliacao(eco_id: str, usuarioId: str, nota: int, comentario: str)
     return {"id": av_id, "message": "Avaliação adicionada com sucesso"}
 
 
-# ==============================
-# SUGESTÕES DE ECOPONTOS (FORM USUÁRIOS)
-# ==============================
+# --- ROTAS SUGESTÕES DE ECOPONTOS ---
 @app.post("/sugestoes")
 def sugerir_ecoponto(usuarioId: str, nome: str, endereco: str, cep: str,
                      latitude: float, longitude: float):
@@ -150,4 +148,3 @@ def rejeitar_sugestao(sug_id: str):
         raise HTTPException(status_code=404, detail="Sugestão não encontrada")
     ref.update({"status": "rejeitado"})
     return {"message": "Sugestão rejeitada"}
-
