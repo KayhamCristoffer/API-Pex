@@ -13,10 +13,6 @@ app = FastAPI(title="Teste FastAPI Firebase")
 def root():
     return {"message": "API funcionando"}
 ####
-@app.get("/teste")
-def teste_firebase():
-    ref = db.reference("/")
-    return {"firebase_root": ref.get()}
     
 # 🔹 Inicializa Firebase
 if not len(initialize_app._apps):
