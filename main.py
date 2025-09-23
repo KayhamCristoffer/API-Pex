@@ -46,16 +46,6 @@ if not firebase_admin._apps:
 # ==============================
 # 3. ROTA DE TESTE
 # ==============================
-@app.get("/test-db")
-def test_database_connection():
-    try:
-        # Tenta ler um nó do banco de dados para confirmar a conexão
-        ref = db.reference("ecopontos")
-        data = ref.get()
-        return {"status": "ok", "message": "Conexão com o banco de dados bem-sucedida!", "data": data}
-    except Exception as e:
-        # Se algo falhar, retorna um erro 500 com a mensagem de erro detalhada
-        raise HTTPException(status_code=500, detail=f"Erro na conexão com o banco de dados: {e}")
 
 @app.get("/full-db")
 def mostrar_banco_completo():
