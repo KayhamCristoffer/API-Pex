@@ -3,7 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import credentials, initialize_app, db
 from datetime import datetime
 import uuid, os
+from firebase_config import db
 
+@app.get("/teste")
+def testar_conexao():
+    ref = db.reference("/")
+    return {"firebase_root": ref.get()}
+    
 # 🔹 Inicializa Firebase
 if not len(initialize_app._apps):
     cred = credentials.Certificate("serviceAccountKey.json")
