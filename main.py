@@ -3,7 +3,7 @@
 # ==============================
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel # Importa o BaseModel para criar modelos de dados
+from pydantic import BaseModel
 import firebase_admin
 from firebase_admin import credentials, db, initialize_app
 from datetime import datetime
@@ -12,7 +12,6 @@ import uuid, os, json
 # ===============================================
 # 2. MODELOS Pydantic
 # ===============================================
-# Define a estrutura dos dados que a API vai receber e enviar
 class EcopontoBase(BaseModel):
     nome: str
     endereco: str
@@ -41,8 +40,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# 🔹 CORS
-# Configura o CORS para aceitar requisições de qualquer origem
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -51,7 +48,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔹 Inicializa Firebase
 if not firebase_admin._apps:
     try:
         firebase_config_str = os.getenv("FIREBASE_CONFIG_JSON")
@@ -77,7 +73,6 @@ if not firebase_admin._apps:
 def root():
     return {"message": "🚀 API Rotas Ecopontos Online!", "docs": "/docs"}
 
-
 # --- ROTAS ECOPONTOS ---
 @app.get("/ecopontos")
 def listar_ecopontos():
@@ -96,16 +91,7 @@ def obter_ecoponto(eco_id: str):
 def criar_ecoponto(ecoponto: EcopontoCreate):
     eco_id = str(uuid.uuid4())
     ref = db.reference(f"ecopontos/{eco_id}")
-    ref.set({
-        "nome": ecoponto.nome,
-        "endereco": ecoponto.endereco,
-        "cep": ecoponto.cep,
-        "latitude": ecoponto.latitude,
-        "longitude": ecoponto.longitude,
-        "criadoPor": ecoponto.criadoPor,
-        "criadoEm": datetime.utcnow().isoformat() + "Z",
-        "status": "ativo"
-    })
+    ref.set(ecoponto.dict())
     return {"id": eco_id, "message": "Ecoponto adicionado com sucesso"}
 
 @app.put("/ecopontos/{eco_id}")
@@ -113,8 +99,6 @@ def atualizar_ecoponto(eco_id: str, ecoponto: EcopontoBase):
     ref = db.reference(f"ecopontos/{eco_id}")
     if not ref.get():
         raise HTTPException(status_code=404, detail="Ecoponto não encontrado")
-    
-    # Usa ecoponto.dict() que é mais seguro para o update
     ref.update(ecoponto.dict())
     return {"id": eco_id, "message": "Ecoponto atualizado com sucesso"}
 
@@ -125,7 +109,6 @@ def deletar_ecoponto(eco_id: str):
         raise HTTPException(status_code=404, detail="Ecoponto não encontrado")
     ref.delete()
     return {"id": eco_id, "message": "Ecoponto deletado com sucesso"}
-
 
 # --- ROTAS AVALIAÇÕES ---
 @app.get("/ecopontos/{eco_id}/avaliacoes")
@@ -141,18 +124,10 @@ def adicionar_avaliacao(eco_id: str, avaliacao: Avaliacao):
     ref_eco = db.reference(f"ecopontos/{eco_id}")
     if not ref_eco.get():
         raise HTTPException(status_code=404, detail="Ecoponto não encontrado")
-
     av_id = str(uuid.uuid4())
     ref = db.reference(f"ecopontos/{eco_id}/avaliacoes/{av_id}")
-    # Usa a forma explícita para evitar erros
-    ref.set({
-        "usuarioId": avaliacao.usuarioId,
-        "nota": avaliacao.nota,
-        "comentario": avaliacao.comentario,
-        "data": datetime.utcnow().isoformat() + "Z"
-    })
+    ref.set(avaliacao.dict())
     return {"id": av_id, "message": "Avaliação adicionada com sucesso"}
-
 
 # --- ROTAS SUGESTÕES DE ECOPONTOS ---
 @app.get("/sugestoes")
@@ -164,17 +139,7 @@ def listar_sugestoes():
 def sugerir_ecoponto(sugestao: SugestaoEcoponto):
     sug_id = str(uuid.uuid4())
     ref = db.reference(f"sugestoes_ecopontos/{sug_id}")
-    # Usa a forma explícita para evitar erros
-    ref.set({
-        "nome": sugestao.nome,
-        "endereco": sugestao.endereco,
-        "cep": sugestao.cep,
-        "latitude": sugestao.latitude,
-        "longitude": sugestao.longitude,
-        "usuarioId": sugestao.usuarioId,
-        "data": datetime.utcnow().isoformat() + "Z",
-        "status": "pendente"
-    })
+    ref.set(sugestao.dict())
     return {"id": sug_id, "message": "Sugestão enviada para análise"}
 
 @app.post("/sugestoes/aprovar/{sug_id}")
@@ -183,10 +148,11 @@ def aprovar_sugestao(sug_id: str):
     sugestao = ref.get()
     if not sugestao:
         raise HTTPException(status_code=404, detail="Sugestão não encontrada")
-
     eco_id = str(uuid.uuid4())
     eco_ref = db.reference(f"ecopontos/{eco_id}")
-    eco_ref.set({
+    
+    # Criando o dicionário de forma explícita
+    eco_data = {
         "nome": sugestao["nome"],
         "endereco": sugestao["endereco"],
         "cep": sugestao["cep"],
@@ -195,7 +161,8 @@ def aprovar_sugestao(sug_id: str):
         "criadoPor": sugestao["usuarioId"],
         "criadoEm": datetime.utcnow().isoformat() + "Z",
         "status": "ativo"
-    })
+    }
+    eco_ref.set(eco_data)
     ref.update({"status": "aprovado"})
     return {"message": "Ecoponto aprovado e movido para ecopontos", "eco_id": eco_id}
 
@@ -206,7 +173,6 @@ def rejeitar_sugestao(sug_id: str):
         raise HTTPException(status_code=404, detail="Sugestão não encontrada")
     ref.update({"status": "rejeitado"})
     return {"message": "Sugestão rejeitada"}
-
 
 # --- ROTAS USUÁRIOS ---
 @app.get("/users/{user_id}")
