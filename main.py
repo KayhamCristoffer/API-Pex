@@ -3,10 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import credentials, initialize_app, db
 from datetime import datetime
 import uuid, os
+####
+from fastapi import FastAPI
 from firebase_config import db
 
+app = FastAPI(title="Teste FastAPI Firebase")
+
+@app.get("/")
+def root():
+    return {"message": "API funcionando"}
+####
 @app.get("/teste")
-def testar_conexao():
+def teste_firebase():
     ref = db.reference("/")
     return {"firebase_root": ref.get()}
     
