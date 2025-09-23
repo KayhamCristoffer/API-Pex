@@ -1,19 +1,20 @@
 # ==============================
 # 1. IMPORTS NO TOPO DO ARQUIVO
 # ==============================
-from typing import Optional
+from typing import Optional, Dict
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 import firebase_admin
 from firebase_admin import credentials, db, auth, initialize_app
-import os, json
+from datetime import datetime
+import os, json, uuid
 
 # ===============================================
 # 2. INICIALIZAÇÃO DA APLICAÇÃO E FIREBASE
 # ===============================================
 app = FastAPI(
-    title="API de Usuários com Firebase",
+    title="API Sustentabilidade - SustaMbiTech",
     version="1.0.0"
 )
 
@@ -49,6 +50,8 @@ if not firebase_admin._apps:
 # ===============================================
 # 3. SCHEMAS PYDANTIC
 # ===============================================
+
+# Schemas para a rota de usuários
 class UsuarioCreate(BaseModel):
     email: EmailStr
     senha: str
@@ -64,6 +67,50 @@ class UsuarioOut(BaseModel):
 class TokenData(BaseModel):
     uid: str
 
+# Schemas para a rota de ecopontos
+class Avaliacao(BaseModel):
+    usuarioId: str
+    nota: int
+    comentario: str
+    data: str = ""
+
+class EcopontoCreate(BaseModel):
+    nome: str
+    endereco: str
+    cep: str
+    latitude: float
+    longitude: float
+    criadoPor: str
+    status: str
+    avaliacoes: Optional[Dict[str, Avaliacao]] = {}
+
+class EcopontoUpdate(BaseModel):
+    nome: Optional[str] = None
+    endereco: Optional[str] = None
+    cep: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    status: Optional[str] = None
+
+# Schema para a rota de sugestões
+class SugestaoCreate(BaseModel):
+    usuarioId: str
+    nome: str
+    endereco: str
+    cep: str
+    latitude: float
+    longitude: float
+
+class SugestaoOut(BaseModel):
+    usuarioId: str
+    nome: str
+    endereco: str
+    cep: str
+    latitude: float
+    longitude: float
+    data: str
+    status: str
+
 # ===============================================
 # 4. SEGURANÇA E DEPENDÊNCIAS
 # ===============================================
@@ -74,15 +121,12 @@ async def get_current_user(token: str) -> dict:
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        # Verifica e decodifica o token de ID do Firebase
         decoded_token = auth.verify_id_token(token)
         uid = decoded_token['uid']
         return decoded_token
     except auth.AuthError:
-        # Erro de autenticação do Firebase (token expirado, inválido, etc.)
         raise credentials_exc
     except Exception:
-        # Outros erros
         raise credentials_exc
 
 # ===============================================
@@ -98,53 +142,34 @@ def mostrar_banco_completo():
     dados_completos = ref.get() or {}
     return dados_completos
 
+# Rotas de Usuários (mantidas do código anterior)
 @app.post("/register", response_model=UsuarioOut, status_code=status.HTTP_201_CREATED)
 def criar_usuario(user_data: UsuarioCreate):
     """
-    Cria um novo usuário com email e senha no Firebase Auth
-    e salva dados adicionais no Firebase Realtime Database.
+    Cria um novo usuário no Firebase Auth e salva dados adicionais.
     """
     try:
-        # 1. Cria o usuário no Firebase Authentication
         firebase_user = auth.create_user(
             email=user_data.email,
             password=user_data.senha
         )
-        
-        # 2. Salva informações adicionais no Realtime Database
         db_ref = db.reference(f'users/{firebase_user.uid}')
         db_ref.set({
             "email": user_data.email,
             "nome": user_data.nome,
             "usuario": user_data.usuario
         })
-
-        return UsuarioOut(
-            id=firebase_user.uid,
-            email=user_data.email,
-            nome=user_data.nome,
-            usuario=user_data.usuario
-        )
+        return UsuarioOut(id=firebase_user.uid, email=user_data.email, nome=user_data.nome, usuario=user_data.usuario)
     except firebase_admin.auth.EmailAlreadyExistsError:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="O e-mail já está em uso."
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="O e-mail já está em uso.")
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao criar usuário: {e}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro ao criar usuário: {e}")
 
 @app.get("/users/me", response_model=UsuarioOut)
 def ler_usuario_atual(token: str, current_user: dict = Depends(get_current_user)):
     """
     Retorna os dados do usuário autenticado.
-    
-    Esta rota é protegida. O cliente deve enviar o token de ID
-    do Firebase no cabeçalho Authorization como 'Bearer <token>'.
     """
-    # Recupera os dados do banco de dados
     db_ref = db.reference(f'users/{current_user["uid"]}')
     user_data = db_ref.get()
     
@@ -157,3 +182,82 @@ def ler_usuario_atual(token: str, current_user: dict = Depends(get_current_user)
         nome=user_data.get("nome"),
         usuario=user_data.get("usuario")
     )
+
+# Rotas para Ecopontos
+@app.get("/ecopontos")
+def listar_ecopontos():
+    """
+    Lista todos os ecopontos do banco de dados.
+    """
+    ecopontos_ref = db.reference('ecopontos')
+    ecopontos = ecopontos_ref.get() or {}
+    return ecopontos
+
+@app.get("/ecopontos/{ecoponto_id}")
+def obter_ecoponto(ecoponto_id: str):
+    """
+    Retorna um ecoponto específico pelo seu ID.
+    """
+    ecoponto_ref = db.reference(f'ecopontos/{ecoponto_id}')
+    ecoponto = ecoponto_ref.get()
+    if not ecoponto:
+        raise HTTPException(status_code=404, detail="Ecoponto não encontrado.")
+    return ecoponto
+
+@app.post("/ecopontos", status_code=status.HTTP_201_CREATED)
+def criar_ecoponto(ecoponto_data: EcopontoCreate):
+    """
+    Cria um novo ecoponto no banco de dados.
+    """
+    ecopontos_ref = db.reference('ecopontos')
+    
+    # Adiciona a data de criação e gera um ID único
+    ecoponto_dict = ecoponto_data.dict()
+    ecoponto_dict["criadoEm"] = datetime.utcnow().isoformat() + "Z"
+    
+    # O método 'push()' cria um ID único para o novo registro
+    novo_ecoponto_ref = ecopontos_ref.push(ecoponto_dict)
+    return {"message": "Ecoponto criado com sucesso.", "id": novo_ecoponto_ref.key}
+
+@app.put("/ecopontos/{ecoponto_id}")
+def atualizar_ecoponto(ecoponto_id: str, ecoponto_data: EcopontoUpdate):
+    """
+    Atualiza um ecoponto existente.
+    """
+    ecoponto_ref = db.reference(f'ecopontos/{ecoponto_id}')
+    existente = ecoponto_ref.get()
+    if not existente:
+        raise HTTPException(status_code=404, detail="Ecoponto não encontrado para atualização.")
+    
+    # O método 'update()' atualiza apenas os campos fornecidos
+    ecoponto_ref.update(ecoponto_data.dict(exclude_unset=True))
+    return {"message": "Ecoponto atualizado com sucesso."}
+
+@app.delete("/ecopontos/{ecoponto_id}")
+def deletar_ecoponto(ecoponto_id: str):
+    """
+    Deleta um ecoponto específico.
+    """
+    ecoponto_ref = db.reference(f'ecopontos/{ecoponto_id}')
+    if not ecoponto_ref.get():
+        raise HTTPException(status_code=404, detail="Ecoponto não encontrado.")
+    ecoponto_ref.delete()
+    return {"message": "Ecoponto deletado com sucesso."}
+
+# Rotas para Sugestões
+@app.post("/sugestoes_ecopontos", response_model=SugestaoOut, status_code=status.HTTP_201_CREATED)
+def criar_sugestao(sugestao_data: SugestaoCreate):
+    """
+    Cria uma nova sugestão de ecoponto.
+    """
+    sugestoes_ref = db.reference('sugestoes_ecopontos')
+    sugestao_dict = sugestao_data.dict()
+    sugestao_dict.update({
+        "data": datetime.utcnow().isoformat() + "Z",
+        "status": "pendente"
+    })
+    
+    # Usa um UUID para garantir um ID único para cada sugestão
+    sugestoes_ref.child(str(uuid.uuid4())).set(sugestao_dict)
+    
+    return SugestaoOut(**sugestao_dict)
