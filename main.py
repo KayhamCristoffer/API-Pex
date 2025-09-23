@@ -72,6 +72,7 @@ if not firebase_admin._apps:
 # ==============================
 # 4. ROTAS DA API
 # ==============================
+
 @app.get("/")
 def root():
     return {"message": "🚀 API Rotas Ecopontos Online!", "docs": "/docs"}
@@ -82,7 +83,7 @@ def root():
 def listar_ecopontos():
     ref = db.reference("ecopontos")
     return ref.get() or {}
-    
+
 @app.get("/ecopontos/{eco_id}")
 def obter_ecoponto(eco_id: str):
     ref = db.reference(f"ecopontos/{eco_id}")
@@ -90,7 +91,7 @@ def obter_ecoponto(eco_id: str):
     if not ecoponto:
         raise HTTPException(status_code=404, detail="Ecoponto não encontrado")
     return ecoponto
-    
+
 @app.post("/ecopontos")
 def criar_ecoponto(ecoponto: EcopontoCreate):
     eco_id = str(uuid.uuid4())
@@ -113,6 +114,7 @@ def atualizar_ecoponto(eco_id: str, ecoponto: EcopontoBase):
     if not ref.get():
         raise HTTPException(status_code=404, detail="Ecoponto não encontrado")
     
+    # Usa ecoponto.dict() que é mais seguro para o update
     ref.update(ecoponto.dict())
     return {"id": eco_id, "message": "Ecoponto atualizado com sucesso"}
 
@@ -126,6 +128,14 @@ def deletar_ecoponto(eco_id: str):
 
 
 # --- ROTAS AVALIAÇÕES ---
+@app.get("/ecopontos/{eco_id}/avaliacoes")
+def obter_avaliacoes_ecoponto(eco_id: str):
+    ref = db.reference(f"ecopontos/{eco_id}/avaliacoes")
+    avaliacoes = ref.get()
+    if not avaliacoes:
+        raise HTTPException(status_code=404, detail="Ecoponto ou avaliações não encontrados")
+    return avaliacoes
+
 @app.post("/avaliacoes/{eco_id}")
 def adicionar_avaliacao(eco_id: str, avaliacao: Avaliacao):
     ref_eco = db.reference(f"ecopontos/{eco_id}")
@@ -134,29 +144,38 @@ def adicionar_avaliacao(eco_id: str, avaliacao: Avaliacao):
 
     av_id = str(uuid.uuid4())
     ref = db.reference(f"ecopontos/{eco_id}/avaliacoes/{av_id}")
+    # Usa a forma explícita para evitar erros
     ref.set({
-        **avaliacao.dict(),
+        "usuarioId": avaliacao.usuarioId,
+        "nota": avaliacao.nota,
+        "comentario": avaliacao.comentario,
         "data": datetime.utcnow().isoformat() + "Z"
     })
     return {"id": av_id, "message": "Avaliação adicionada com sucesso"}
 
 
 # --- ROTAS SUGESTÕES DE ECOPONTOS ---
-@app.post("/sugestoes")
-def sugerir_ecoponto(sugestao: SugestaoEcoponto):
-    sug_id = str(uuid.uuid4())
-    ref = db.reference(f"sugestoes_ecopontos/{sug_id}")
-    ref.set({
-        **sugestao.dict(),
-        "data": datetime.utcnow().isoformat() + "Z",
-        "status": "pendente"
-    })
-    return {"id": sug_id, "message": "Sugestão enviada para análise"}
-
 @app.get("/sugestoes")
 def listar_sugestoes():
     ref = db.reference("sugestoes_ecopontos")
     return ref.get() or {}
+
+@app.post("/sugestoes")
+def sugerir_ecoponto(sugestao: SugestaoEcoponto):
+    sug_id = str(uuid.uuid4())
+    ref = db.reference(f"sugestoes_ecopontos/{sug_id}")
+    # Usa a forma explícita para evitar erros
+    ref.set({
+        "nome": sugestao.nome,
+        "endereco": sugestao.endereco,
+        "cep": sugestao.cep,
+        "latitude": sugestao.latitude,
+        "longitude": sugestao.longitude,
+        "usuarioId": sugestao.usuarioId,
+        "data": datetime.utcnow().isoformat() + "Z",
+        "status": "pendente"
+    })
+    return {"id": sug_id, "message": "Sugestão enviada para análise"}
 
 @app.post("/sugestoes/aprovar/{sug_id}")
 def aprovar_sugestao(sug_id: str):
@@ -179,13 +198,7 @@ def aprovar_sugestao(sug_id: str):
     })
     ref.update({"status": "aprovado"})
     return {"message": "Ecoponto aprovado e movido para ecopontos", "eco_id": eco_id}
-@app.get("/ecopontos/{eco_id}/avaliacoes")
-def obter_avaliacoes_ecoponto(eco_id: str):
-    ref = db.reference(f"ecopontos/{eco_id}/avaliacoes")
-    avaliacoes = ref.get()
-    if not avaliacoes:
-        raise HTTPException(status_code=404, detail="Ecoponto ou avaliações não encontrados")
-    return avaliacoes
+
 @app.post("/sugestoes/rejeitar/{sug_id}")
 def rejeitar_sugestao(sug_id: str):
     ref = db.reference(f"sugestoes_ecopontos/{sug_id}")
@@ -193,7 +206,9 @@ def rejeitar_sugestao(sug_id: str):
         raise HTTPException(status_code=404, detail="Sugestão não encontrada")
     ref.update({"status": "rejeitado"})
     return {"message": "Sugestão rejeitada"}
-    # Obtém os dados de um usuário pelo ID
+
+
+# --- ROTAS USUÁRIOS ---
 @app.get("/users/{user_id}")
 def obter_usuario(user_id: str):
     ref = db.reference(f"users/{user_id}")
