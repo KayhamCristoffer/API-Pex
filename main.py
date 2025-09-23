@@ -3,23 +3,30 @@ from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import credentials, initialize_app, db
 from datetime import datetime
 import uuid, os
-####
-from fastapi import FastAPI
-from firebase_config import db
-
-app = FastAPI(title="Teste FastAPI Firebase")
-
-@app.get("/")
-def root():
-    return {"message": "API funcionando"}
-####
+import json
     
-# 🔹 Inicializa Firebase
-if not len(initialize_app._apps):
-    cred = credentials.Certificate("serviceAccountKey.json")
-    initialize_app(cred, {
-        'databaseURL': os.getenv("FIREBASE_DB_URL")
-    })
+if not firebase_admin._apps:
+    try:
+        # Pega a string JSON da variável de ambiente
+        firebase_config_str = os.getenv("FIREBASE_CONFIG_JSON")
+
+        if not firebase_config_str:
+            raise Exception("Variável de ambiente 'FIREBASE_CONFIG_JSON' não encontrada.")
+
+        # Converte a string JSON para um objeto Python (dicionário)
+        cred_info = json.loads(firebase_config_str)
+
+        # Usa o dicionário para inicializar o Firebase de forma segura
+        cred = credentials.Certificate(cred_info)
+        firebase_admin.initialize_app(cred, {
+            "databaseURL": os.getenv("FIREBASE_DB_URL") # Você já usa uma variável aqui, ótimo!
+        })
+    except json.JSONDecodeError:
+        print("Erro: A variável de ambiente FIREBASE_CONFIG_JSON não é um JSON válido.")
+        raise
+    except Exception as e:
+        print(f"Erro ao inicializar o Firebase: {e}")
+        raise
 
 app = FastAPI(
     title="Rotas Ecopontos API",
