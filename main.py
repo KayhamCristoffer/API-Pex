@@ -10,6 +10,9 @@ from firebase_admin import credentials, db, auth, initialize_app
 from datetime import datetime
 import os, json, uuid
 
+cred = credentials.Certificate("./serviceAccountKey.json")
+firebase_admin.initialize_app(cred)
+
 # ===============================================
 # 2. INICIALIZAÇÃO DA APLICAÇÃO E FIREBASE
 # ===============================================
@@ -32,14 +35,19 @@ if not firebase_admin._apps:
     try:
         firebase_config_str = os.getenv("FIREBASE_CONFIG_JSON")
         firebase_db_url = os.getenv("FIREBASE_DB_URL")
+        
         if not firebase_config_str or not firebase_db_url:
             raise Exception("Variáveis de ambiente 'FIREBASE_CONFIG_JSON' ou 'FIREBASE_DB_URL' não encontradas.")
         
+        # Converte a string JSON da variável de ambiente em um dicionário Python
         cred_info = json.loads(firebase_config_str)
         cred = credentials.Certificate(cred_info)
+        
         initialize_app(cred, {
             "databaseURL": firebase_db_url
         })
+        print("Firebase inicializado com sucesso a partir das variáveis de ambiente.")
+
     except json.JSONDecodeError:
         print("Erro: A variável de ambiente FIREBASE_CONFIG_JSON não é um JSON válido.")
         raise
