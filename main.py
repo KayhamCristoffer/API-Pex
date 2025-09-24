@@ -38,15 +38,10 @@ if not firebase_admin._apps:
         
         # Converte a string JSON da variável de ambiente em um dicionário Python
         cred_info = json.loads(firebase_config_str)
-        print(cred_info)
         cred = credentials.Certificate(cred_info)
-        print(cred)
         initialize_app(cred, {
             "databaseURL": firebase_db_url
         })
-        
-        print(firebase_db_url)
-        print(databaseURL)
         
         print("Firebase inicializado com sucesso a partir das variáveis de ambiente.")
 
