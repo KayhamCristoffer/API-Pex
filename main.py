@@ -1,111 +1,110 @@
-# ==============================
-
-# 1. IMPORTS NO TOPO DO ARQUIVO
-
-# ==============================
-
-from fastapi import FastAPI, HTTPException
-
-from fastapi.middleware.cors import CORSMiddleware
-
+# main.py
+from fastapi import FastAPI
 from pydantic import BaseModel
-
+import os
+import json
 import firebase_admin
+from firebase_admin import credentials, db
 
-from firebase_admin import credentials, db, initialize_app
+# Inicializa o app FastAPI
+app = FastAPI()
 
-from datetime import datetime
+# Modelos Pydantic para validação dos dados de entrada
+class User(BaseModel):
+    email: str
+    nome: str
+    sobrenome: str
+    newsletterOptIn: bool = False
+    nivel: str = "comum"
+    
+class Ecoponto(BaseModel):
+    nome: str
+    endereco: str
+    cep: str
+    latitude: float
+    longitude: float
+    criadoPor: str
+    status: str = "ativo"
 
-import uuid, os, json
+class SugestaoEcoponto(BaseModel):
+    usuarioId: str
+    nome: str
+    endereco: str
+    cep: str
+    latitude: float
+    longitude: float
+    status: str = "pendente"
 
+# Configuração e inicialização do Firebase
+firebase_creds_json_string = os.environ.get('FIREBASE_CREDENTIALS')
+firebase_db_url = os.environ.get('FIREBASE_DATABASE_URL')
 
+# Referências globais para o banco de dados
+users_ref = None
+ecopontos_ref = None
+sugestoes_ref = None
 
-# ===============================================
+if firebase_creds_json_string and firebase_db_url:
+    cred_dict = json.loads(firebase_creds_json_string)
+    cred = credentials.Certificate(cred_dict)
 
-# 2. INICIALIZAÇÃO DA APLICAÇÃO E FIREBASE
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': firebase_db_url
+    })
 
-# ===============================================
+    # Define as referências para as coleções principais
+    users_ref = db.reference('users')
+    ecopontos_ref = db.reference('ecopontos')
+    sugestoes_ref = db.reference('sugestoes_ecopontos')
 
+# Rota de teste
+@app.get("/")
+def read_root():
+    return {"message": "API está funcionando!"}
 
+# Rotas para interagir com 'users'
+@app.get("/users/{user_id}")
+def get_user(user_id: str):
+    if users_ref is None:
+        return {"error": "Firebase não inicializado."}
+    user_data = users_ref.child(user_id).get()
+    if user_data:
+        return {"user": user_data}
+    return {"error": "Usuário não encontrado."}
 
-app = FastAPI(
+@app.post("/users/")
+def create_user(user: User):
+    if users_ref is None:
+        return {"error": "Firebase não inicializado."}
+    new_user_ref = users_ref.push(user.dict())
+    return {"message": "Usuário criado com sucesso!", "id": new_user_ref.key}
 
-    title="API de Teste de Conexão com o Banco de Dados",
+# Rotas para interagir com 'ecopontos'
+@app.get("/ecopontos/")
+def get_all_ecopontos():
+    if ecopontos_ref is None:
+        return {"error": "Firebase não inicializado."}
+    ecopontos_data = ecopontos_ref.get()
+    return {"ecopontos": ecopontos_data}
 
-    version="1.0.0"
+@app.post("/ecopontos/")
+def add_ecoponto(ecoponto: Ecoponto):
+    if ecopontos_ref is None:
+        return {"error": "Firebase não inicializado."}
+    new_ecoponto_ref = ecopontos_ref.push(ecoponto.dict())
+    return {"message": "Ecoponto adicionado com sucesso!", "id": new_ecoponto_ref.key}
 
-)
+# Rotas para interagir com 'sugestoes_ecopontos'
+@app.post("/sugestoes/")
+def add_sugestao(sugestao: SugestaoEcoponto):
+    if sugestoes_ref is None:
+        return {"error": "Firebase não inicializado."}
+    new_sugestao_ref = sugestoes_ref.push(sugestao.dict())
+    return {"message": "Sugestão de ecoponto adicionada com sucesso!", "id": new_sugestao_ref.key}
 
-
-
-app.add_middleware(
-
-    CORSMiddleware,
-
-    allow_origins=["*"],
-
-    allow_credentials=True,
-
-    allow_methods=["*"],
-
-    allow_headers=["*"],
-
-)
-
-
-
-if not firebase_admin._apps:
-
-    try:
-
-        firebase_config_str = os.getenv("FIREBASE_CONFIG_JSON")
-
-        if not firebase_config_str:
-
-            raise Exception("Variável de ambiente 'FIREBASE_CONFIG_JSON' não encontrada.")
-
-        cred_info = json.loads(firebase_config_str)
-
-        cred = credentials.Certificate(cred_info)
-
-        initialize_app(cred, {
-
-            "databaseURL": os.getenv("FIREBASE_DB_URL")
-
-        })
-
-    except json.JSONDecodeError:
-
-        print("Erro: A variável de ambiente FIREBASE_CONFIG_JSON não é um JSON válido.")
-
-        raise
-
-    except Exception as e:
-
-        print(f"Erro ao inicializar o Firebase: {e}")
-
-        raise
-
-
-
-# ==============================
-
-# 3. ROTA DE TESTE
-
-# ==============================
-
-@app.get("/full-db")
-
-def mostrar_banco_completo():
-
-    """
-
-    Retorna todo o conteúdo do banco de dados do Firebase.
-
-    """
-
-    ref = db.reference()
-
-    dados_completos = ref.get() or {}
-
-    return dados_completos
+@app.get("/sugestoes/")
+def get_all_sugestoes():
+    if sugestoes_ref is None:
+        return {"error": "Firebase não inicializado."}
+    sugestoes_data = sugestoes_ref.get()
+    return {"sugestoes": sugestoes_data}
