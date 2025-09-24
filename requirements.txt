@@ -8,6 +8,6 @@ pydantic
 python-multipart
 requests
 firebase-admin
-gunicorn
+# gunicorn
 python-dotenv
 firebase-admin
