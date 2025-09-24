@@ -10,9 +10,6 @@ from firebase_admin import credentials, db, auth, initialize_app
 from datetime import datetime
 import os, json, uuid
 
-cred = credentials.Certificate("./serviceAccountKey.json")
-firebase_admin.initialize_app(cred)
-
 # ===============================================
 # 2. INICIALIZAÇÃO DA APLICAÇÃO E FIREBASE
 # ===============================================
