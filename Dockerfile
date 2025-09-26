@@ -1,13 +1,19 @@
-FROM python:3.10-slim
+# Usa uma imagem oficial do Node.js
+FROM node:18-slim
 
+# Define o diretório de trabalho dentro do container
 WORKDIR /app
 
-COPY requirements.txt .
+# Copia o package.json e o package-lock.json (se existir)
+COPY package*.json ./
 
-RUN pip install --no-cache-dir -r requirements.txt
+# Instala as dependências
+RUN npm install
 
+# Copia o restante dos arquivos da aplicação
 COPY . .
 
-# EXPOSE 8000
-
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+# Comando para iniciar a aplicação
+# Usa a variável de ambiente PORT, padrão para 8080 se não definida (necessário para alguns hosts como Google Cloud Run)
+ENV PORT 8080
+CMD [ "npm", "start" ]
